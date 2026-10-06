@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="36" viewBox="0 0 128 36" role="img" aria-label="English — switch language">
+  <title>English — switch language</title>
+  <rect x="0.5" y="0.5" width="127" height="35" rx="17.5" fill="#f5f6f8" stroke="#d5d9e2"/>
+  <g fill="none" stroke="#68738a" stroke-width="1.25" stroke-linecap="round">
+    <circle cx="19" cy="18" r="6.5"/>
+    <ellipse cx="19" cy="18" rx="2.8" ry="6.5"/>
+    <path d="M12.5 18h13"/>
+  </g>
+  <text x="35" y="22.5" fill="#303849" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans KR', sans-serif" font-size="13" font-weight="600">English</text>
+  <path d="m108 15 3 3-3 3" fill="none" stroke="#8992a5" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
