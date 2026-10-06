@@ -13,8 +13,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Bash syntax
-        run: bash -n aptup && bash -n install.sh
+        run: for file in aptup install.sh tests/smoke.sh; do bash -n "$file"; done
       - name: ShellCheck
-        run: shellcheck aptup install.sh
-      - name: Mocked tests (no system package changes)
-        run: python3 -m unittest discover -s tests -v
+        run: shellcheck aptup install.sh tests/smoke.sh
+      - name: Mocked smoke tests
+        run: bash tests/smoke.sh
