@@ -1,0 +1,117 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage: aptup [--autoremove] [--autoclean] [--dry-run]
+
+Refresh APT package lists, then upgrade installed packages without removals.
+Review the plan, confirm, and review APT's own package prompts.
+
+  --autoremove  Also remove unused dependency packages (without purging).
+  --autoclean   Also delete cached package files that can no longer be downloaded.
+  --dry-run     Print the commands only; do not contact repositories or use sudo.
+  -h, --help    Show this help.
+
+Requires Linux, Bash, APT 2.2+ and sudo (unless already root).
+Run interactively. There is deliberately no automatic yes option.
+EOF
+}
+
+die() {
+  printf 'aptup: %s\n' "$*" >&2
+  exit 1
+}
+
+autoremove=false
+autoclean=false
+dry_run=false
+for argument in "$@"; do
+  case "$argument" in
+    --autoremove) autoremove=true ;;
+    --autoclean) autoclean=true ;;
+    --dry-run) dry_run=true ;;
+    -h|--help) usage; exit 0 ;;
+    *) printf 'aptup: unknown option: %s\n' "$argument" >&2; usage >&2; exit 2 ;;
+  esac
+done
+
+privilege=()
+if (( EUID != 0 )); then
+  privilege=(sudo)
+fi
+
+step() {
+  local description=$1 status
+  shift
+  if "$dry_run"; then
+    printf '  '
+    printf '%q ' "${privilege[@]}" "$@"
+    printf '\n'
+  else
+    printf '\n%s\n' "$description"
+    if "${privilege[@]}" "$@"; then
+      return 0
+    else
+      status=$?
+      printf 'aptup: %s failed (exit %s). Stopped; no later steps were run.\n' \
+        "$description" "$status" >&2
+      exit "$status"
+    fi
+  fi
+}
+
+run_steps() {
+  step 'Refreshing package lists' apt-get --error-on=any update
+  step 'Upgrading installed packages' apt-get -o quiet=0 -o APT::Get::Assume-Yes=false --no-remove upgrade
+  if "$autoremove"; then
+    step 'Removing unused dependencies' apt-get -o quiet=0 -o APT::Get::Assume-Yes=false \
+      -o APT::Get::Purge=false autoremove
+  fi
+  if "$autoclean"; then
+    step 'Cleaning obsolete package cache' apt-get autoclean
+  fi
+}
+
+# Use the same command definitions for the preview and execution.
+requested_dry_run=$dry_run
+dry_run=true
+printf 'Planned commands:\n'
+run_steps
+dry_run=$requested_dry_run
+printf '\nThis is a command preview, not a package-change simulation.\n'
+if "$dry_run"; then
+  exit 0
+fi
+
+[[ $OSTYPE == linux* ]] || die 'Linux is required.'
+command -v apt-get >/dev/null 2>&1 || die 'apt-get was not found. Use an APT-based Linux system.'
+if (( EUID != 0 )); then
+  command -v sudo >/dev/null 2>&1 || die 'sudo was not found. Install it yourself or run aptup as root.'
+fi
+[[ -t 0 ]] || die 'An interactive terminal is required. Use --dry-run to preview commands.'
+
+if "$autoremove"; then
+  printf 'Warning: --autoremove can remove packages. Review APT\047s list carefully.\n'
+fi
+if "$autoclean"; then
+  printf 'Warning: --autoclean deletes obsolete cached package files.\n'
+fi
+printf 'Continue? [y/N] '
+answer=
+if ! read -r answer; then
+  printf '\nCancelled.\n'
+  exit 0
+fi
+case "$answer" in
+  y|Y|yes|YES|Yes) ;;
+  *) printf 'Cancelled.\n'; exit 0 ;;
+esac
+
+trap 'printf "\naptup: Interrupted. Review APT output before trying again.\n" >&2; exit 130' INT
+trap 'printf "\naptup: Terminated. Review APT output before trying again.\n" >&2; exit 143' TERM
+run_steps
+printf '\naptup: All requested steps completed. Packages may still be held back.\n'
+if [[ -f /var/run/reboot-required ]]; then
+  printf 'The system reports that a reboot is required. Reboot when you are ready.\n'
+fi
